@@ -83,7 +83,7 @@
                                             <th>رقم الجوال</th>
                                             <th>تاريخ الانتهاء</th>
                                             <th>الحالة</th>
-                                            <th>بصمة الجهاز (ID)</th>
+                                            <th>عدد الأجهزة المربوطة</th>
                                             <th>الإجراءات</th>
                                         </tr>
                                     </thead>
@@ -117,6 +117,25 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // دالة لحساب عدد الأجهزة المربوطة بالاشتراك بشكل دقيق
+        function getDeviceCount(data) {
+            if (!data) return 0;
+            const dev = data.devices !== undefined ? data.devices : data.deviceId;
+            if (!dev) return 0;
+            if (Array.isArray(dev)) return dev.length;
+            if (typeof dev === 'string') {
+                const trimmed = dev.trim();
+                if (!trimmed || trimmed === '❌ غير مربوط بجهاز') return 0;
+                if (trimmed.includes(',')) {
+                    return trimmed.split(',').map(s => s.trim()).filter(Boolean).length;
+                }
+                return 1;
+            }
+            if (typeof dev === 'number') return dev;
+            if (typeof dev === 'object') return Object.keys(dev).length;
+            return 0;
+        }
+
         async function loadSubscribers() {
             const tbody = document.getElementById('subscribersTableBody');
             tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-muted">جاري التحديث...</td></tr>`;
@@ -136,16 +155,26 @@
                     const phone = data.phone || docId;
                     const expire = data.expireDate || 'غير محدد';
                     const active = data.isActive === true || data.isActive === 'true';
-                    const device = data.deviceId || '❌ غير مربوط بجهاز';
+                    const deviceCount = getDeviceCount(data);
+                    const rawDevice = data.deviceId || data.devices || '';
+
+                    // عرض عدد الأجهزة بشكل أنيق
+                    let deviceBadge = '';
+                    if (deviceCount > 0) {
+                        const label = deviceCount === 1 ? 'جهاز واحد' : deviceCount === 2 ? 'جهازين' : `${deviceCount} أجهزة`;
+                        deviceBadge = `<span class="badge bg-info text-dark fw-bold" title="${rawDevice}">📱 ${label}</span>`;
+                    } else {
+                        deviceBadge = `<span class="text-muted fs-7">0 جهاز</span>`;
+                    }
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="fw-bold">${phone}</td>
                         <td><span class="text-secondary">${expire}</span></td>
                         <td><span class="status-badge ${active ? 'status-active' : 'status-inactive'}">${active ? 'نشط' : 'موقف'}</span></td>
-                        <td style="font-size: 0.85rem;">${data.deviceId ? `<span class="badge bg-secondary">${device}</span>` : `<span class="text-muted">${device}</span>`}</td>
+                        <td>${deviceBadge}</td>
                         <td>
-                            ${data.deviceId ? `<button onclick="unlinkDevice('${docId}', '${phone}', '${expire}', ${active})" class="btn btn-sm btn-warning me-1 fw-bold">فك الجهاز</button>` : ''}
+                            ${deviceCount > 0 ? `<button onclick="unlinkDevice('${docId}', '${phone}', '${expire}', ${active})" class="btn btn-sm btn-warning me-1 fw-bold">فك الجهاز</button>` : ''}
                             <button onclick="deleteSubscriber('${docId}')" class="btn btn-sm btn-danger fw-bold">حذف</button>
                         </td>
                     `;

@@ -98,6 +98,30 @@
                     </div>
                 </div>
             </div>
+
+            <!-- قسم إحصائيات موافقات الشروط -->
+            <div class="row mt-4 mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); color: white; border-radius: 16px;">
+                        <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div style="width: 56px; height: 56px; background: rgba(255,255,255,0.15); border-radius: 12px;" class="d-flex align-items-center justify-content-center fs-2">
+                                    📜
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-1">إحصائيات موافقة الشروط</h5>
+                                    <p class="mb-0 opacity-75" style="font-size: 0.95rem;">عدد الأشخاص الذين ضغطوا على "أوافق" على الشروط لحظة فتح الموقع</p>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-3 bg-white text-dark px-4 py-2" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                <span class="fs-6 text-muted fw-bold">إجمالي الموافقات:</span>
+                                <span id="agreementsCountDisplay" class="fw-bold fs-2 text-primary">0</span>
+                                <span class="badge bg-success text-white fs-6">مباشر 🟢</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -117,6 +141,28 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // دالة المتابعة الفورية لعدد موافقات الشروط
+        function listenAgreementsCount() {
+            try {
+                db.collection("subscribers").doc("agreements_counter").onSnapshot((doc) => {
+                    const el = document.getElementById('agreementsCountDisplay');
+                    if (el) {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            const count = data.agreeCount || 0;
+                            el.innerText = Number(count).toLocaleString('ar-EG');
+                        } else {
+                            el.innerText = '0';
+                        }
+                    }
+                }, (error) => {
+                    console.error("Error loading agreements count:", error);
+                });
+            } catch(e) {
+                console.error("Exception loading agreements count:", e);
+            }
+        }
+
         async function loadSubscribers() {
             const tbody = document.getElementById('subscribersTableBody');
             tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-muted">جاري التحديث...</td></tr>`;
@@ -125,14 +171,12 @@
                 const querySnapshot = await db.collection("subscribers").get();
                 tbody.innerHTML = '';
                 
-                if (querySnapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-muted">لا يوجد أي مشتركين حالياً.</td></tr>`;
-                    return;
-                }
-
+                let foundSubscribers = false;
                 querySnapshot.forEach((doc) => {
-                    const data = doc.data();
                     const docId = doc.id;
+                    if (docId === "agreements_counter") return; // استبعاد مستند عداد الموافقة من قائمة المشتركين
+                    foundSubscribers = true;
+                    const data = doc.data();
                     const phone = data.phone || docId;
                     const expire = data.expireDate || 'غير محدد';
                     const active = data.isActive === true || data.isActive === 'true';
@@ -167,6 +211,10 @@
                     `;
                     tbody.appendChild(tr);
                 });
+
+                if (!foundSubscribers) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-muted">لا يوجد أي مشتركين حالياً.</td></tr>`;
+                }
             } catch (error) {
                 console.error("Error: ", error);
                 tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-danger">فشل تحميل البيانات. تأكد من اتصال السيرفر واضغط تحديث البيانات.</td></tr>`;
@@ -255,8 +303,9 @@
                         adminInput.value = "NasabiAdmin2026";
                     }
 
-                    // تشغيل دالة جلب المشتركين لأول مرة بأمان
+                    // تشغيل دالة جلب المشتركين ومتابعة العداد لأول مرة بأمان
                     loadSubscribers();
+                    listenAgreementsCount();
                 } else if (password === null) {
                     alert("لا يمكنك تصفح اللوحة بدون مفتاح الأمان.");
                     checkPassword();

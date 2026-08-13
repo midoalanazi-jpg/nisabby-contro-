@@ -145,9 +145,11 @@
                         devices = [data.deviceId.toString().trim()];
                     }
 
+                    const isSpecialCode = (phone === "1448" || docId === "1448");
                     const count = devices.length;
-                    const deviceBadgeClass = count > 0 ? (count >= 5 ? 'bg-warning text-dark' : 'bg-info text-dark') : 'bg-secondary text-white';
-                    const deviceBadgeText = count > 0 ? `📱 ${count} / 5 أجهزة` : '❌ لا يوجد أجهزة';
+                    
+                    const deviceBadgeClass = isSpecialCode ? 'bg-success text-white' : (count > 0 ? (count >= 5 ? 'bg-warning text-dark' : 'bg-info text-dark') : 'bg-secondary text-white');
+                    const deviceBadgeText = isSpecialCode ? `📱 غير محدود (${count} جهاز/أجهزة)` : (count > 0 ? `📱 ${count} / 5 أجهزة` : '❌ لا يوجد أجهزة');
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `

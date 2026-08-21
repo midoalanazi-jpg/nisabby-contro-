@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم نظام رخص نصابي (المحدثة)</title>
+    <title>لوحة تحكم نظام رخص نصابي (النسخة السحابية المحدثة)</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -11,42 +11,113 @@
         #adminContent { display: none; }
         
         body { font-family: 'Tajawal', sans-serif; background-color: #f4f6f9; color: #333; }
-        .navbar-custom { background-color: #1e3a8a; color: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .card { border: none; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 24px; }
-        .card-header-custom { background-color: #2563eb; color: white; border-radius: 14px 14px 0 0 !important; font-weight: bold; }
-        .btn-primary { background-color: #2563eb; border: none; }
+        .navbar-custom { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card { border: none; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 24px; }
+        .card-header-custom { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; border-radius: 16px 16px 0 0 !important; font-weight: bold; }
+        .btn-primary { background-color: #2563eb; border: none; border-radius: 10px; }
         .btn-primary:hover { background-color: #1d4ed8; }
-        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
         .status-active { background-color: #d1fae5; color: #065f46; }
         .status-inactive { background-color: #fee2e2; color: #991b1b; }
-        .table th { background-color: #f8fafc; color: #64748b; font-size: 0.9rem; }
+        .table th { background-color: #f8fafc; color: #64748b; font-size: 0.88rem; font-weight: 700; }
         .pin-badge { font-family: monospace; font-size: 0.95rem; font-weight: bold; letter-spacing: 1px; }
+        .stat-card { border-radius: 14px; padding: 18px 20px; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-3px); }
+        .spinner-inline { display: inline-block; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .75s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div id="adminContent">
+        <!-- شريط التنقل العلوي -->
         <nav class="navbar navbar-custom py-3 mb-4">
-            <div class="container d-flex justify-content-between align-items-center">
-                <h4 class="mb-0 fw-bold">نظام رخص وإدارة حسابات نصابي 📋 (النسخة السحابية المحدثة)</h4>
-                <span class="badge bg-danger text-white fs-6">صلاحيات المسؤول</span>
+            <div class="container-fluid px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="font-size: 26px;">📋</span>
+                    <h4 class="mb-0 fw-bold">لوحة تحكم وإدارة رخص نصابي (السحابية المحدثة)</h4>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-danger text-white fs-6 px-3 py-2">صلاحيات المسؤول 🛡️</span>
+                    <button onclick="loadSubscribers()" id="btnTopRefresh" class="btn btn-sm btn-light fw-bold">🔄 تحديث البيانات</button>
+                </div>
             </div>
         </nav>
 
         <div class="container-fluid px-4">
-            <div class="card mb-4 bg-dark text-white">
-                <div class="card-body d-flex align-items-center gap-3 flex-wrap">
-                    <span class="fw-bold fs-5">🔑 مفتاح الأمان لإدارة السيرفر:</span>
+            <!-- مفتاح الأمان لإدارة السيرفر -->
+            <div class="card mb-4 bg-dark text-white border-0">
+                <div class="card-body d-flex align-items-center gap-3 flex-wrap py-3">
+                    <span class="fw-bold fs-5">🔑 مفتاح الأمان المعتمد بالسيرفر:</span>
                     <input type="password" id="adminSecretKey" class="form-control form-control-lg w-50" placeholder="أدخل الكود السري لتتمكن من الحفظ أو التعديل" value="NasabiAdmin2026">
+                </div>
+            </div>
+
+            <!-- بطاقات الإحصائيات السريعة -->
+            <div class="row g-3 mb-4">
+                <!-- بطاقة إجمالي زيارات الموقع -->
+                <div class="col-lg-3 col-md-6">
+                    <div class="card stat-card border-0 shadow-sm text-white" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="d-block opacity-75 fw-bold" style="font-size: 0.9rem;">إجمالي زيارات الموقع 👁️</span>
+                                <h3 class="fw-bold my-1" id="visitsCountDisplay">0</h3>
+                                <small class="badge bg-success text-white">مباشر 🟢</small>
+                            </div>
+                            <div style="font-size: 38px; opacity: 0.85;">🌐</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- بطاقة إجمالي المشتركين -->
+                <div class="col-lg-3 col-md-6">
+                    <div class="card stat-card border-0 shadow-sm bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="d-block text-muted fw-bold" style="font-size: 0.9rem;">👥 إجمالي المشتركين</span>
+                                <h3 class="fw-bold my-1 text-primary" id="totalSubscribersCount">0</h3>
+                                <small class="text-muted">حساب مسجل بالسيرفر</small>
+                            </div>
+                            <div style="font-size: 38px; opacity: 0.7;">👥</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- بطاقة الاشتراكات النشطة -->
+                <div class="col-lg-3 col-md-6">
+                    <div class="card stat-card border-0 shadow-sm bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="d-block text-muted fw-bold" style="font-size: 0.9rem;">🟢 الاشتراكات النشطة</span>
+                                <h3 class="fw-bold my-1 text-success" id="activeSubscribersCount">0</h3>
+                                <small class="text-success fw-bold">حسابات مفعّلة حالياً</small>
+                            </div>
+                            <div style="font-size: 38px; opacity: 0.7;">✅</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- بطاقة إجمالي الأجهزة المرتبطة -->
+                <div class="col-lg-3 col-md-6">
+                    <div class="card stat-card border-0 shadow-sm bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="d-block text-muted fw-bold" style="font-size: 0.9rem;">📱 إجمالي الأجهزة المربوطة</span>
+                                <h3 class="fw-bold my-1 text-dark" id="totalDevicesCount">0</h3>
+                                <small class="text-muted">جهاز متصل بالنظام</small>
+                            </div>
+                            <div style="font-size: 38px; opacity: 0.7;">💻</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div class="row">
                 <!-- قسم إضافة وتعديل مشترك -->
                 <div class="col-lg-3 col-md-4">
-                    <div class="card">
+                    <div class="card shadow-sm">
                         <div class="card-header card-header-custom py-3">
-                            ➕ إضافة / تعديل مشترك
+                            ➕ إضافة / تجديد مشترك
                         </div>
                         <div class="card-body">
                             <form id="subscriberForm">
@@ -70,7 +141,7 @@
                                     <input type="text" id="pinCodeInput" class="form-control" placeholder="اتركه فارغاً ليحدده المعلم">
                                     <small class="text-muted" style="font-size: 11.5px;">إذا تركته فارغاً، سيُطلب من المعلم تعيين كلمة سره عند أول دخول.</small>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">حفظ المشترك بالسيرفر 💾</button>
+                                <button type="submit" id="btnSaveSubscriber" class="btn btn-primary w-100 py-2 fw-bold">حفظ المشترك بالسيرفر 💾</button>
                             </form>
                         </div>
                     </div>
@@ -78,10 +149,15 @@
 
                 <!-- جدول قائمة المشتركين -->
                 <div class="col-lg-9 col-md-8">
-                    <div class="card">
+                    <div class="card shadow-sm">
                         <div class="card-header bg-dark text-white py-3 fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <span>👥 قائمة المشتركين المسجلين والسحابيين</span>
-                            <button onclick="loadSubscribers()" class="btn btn-sm btn-outline-light">🔄 تحديث البيانات</button>
+                            <div class="d-flex align-items-center gap-2">
+                                <span>👥 قائمة المشتركين المسجلين والسحابيين</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="text" id="searchPhoneInput" oninput="filterSubscribers()" class="form-control form-control-sm" placeholder="🔍 بحث برقم الجوال..." style="width: 200px;">
+                                <button onclick="loadSubscribers()" id="btnTableRefresh" class="btn btn-sm btn-outline-light">🔄 تحديث</button>
+                            </div>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
@@ -91,42 +167,23 @@
                                             <th>رقم الجوال</th>
                                             <th>تاريخ الانتهاء</th>
                                             <th>الحالة</th>
-                                            <th>🔐 كلمة السر (PIN)</th>
+                                            <th>🔑 كلمة السر (PIN)</th>
                                             <th>☁️ الحفظ السحابي</th>
-                                            <th>الأجهزة المربوطة</th>
+                                            <th>الأجهزة المرتبطة</th>
                                             <th>الإجراءات</th>
                                         </tr>
                                     </thead>
                                     <tbody id="subscribersTableBody">
                                         <tr>
-                                            <td colspan="7" class="py-4 text-muted">جاري تحميل البيانات من السيرفر...</td>
+                                            <td colspan="7" class="py-4 text-muted">
+                                                <div class="d-flex align-items-center justify-content-center gap-2">
+                                                    <span class="spinner-inline text-primary"></span>
+                                                    <span>جاري تحميل البيانات من السيرفر...</span>
+                                                </div>
+                                            </td>
                                         </tr>
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- قسم إحصائيات موافقات الشروط -->
-            <div class="row mt-3 mb-4">
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); color: white; border-radius: 16px;">
-                        <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
-                            <div class="d-flex align-items-center gap-3">
-                                <div style="width: 56px; height: 56px; background: rgba(255,255,255,0.15); border-radius: 12px;" class="d-flex align-items-center justify-content-center fs-2">
-                                    📜
-                                </div>
-                                <div>
-                                    <h5 class="fw-bold mb-1">إحصائيات موافقة الشروط</h5>
-                                    <p class="mb-0 opacity-75" style="font-size: 0.95rem;">عدد الأشخاص الذين ضغطوا على "أوافق" على الشروط لحظة فتح البرنامج</p>
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center gap-3 bg-white text-dark px-4 py-2" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                                <span class="fs-6 text-muted fw-bold">إجمالي الموافقات:</span>
-                                <span id="agreementsCountDisplay" class="fw-bold fs-2 text-primary">0</span>
-                                <span class="badge bg-success text-white fs-6">مباشر 🟢</span>
                             </div>
                         </div>
                     </div>
@@ -149,51 +206,80 @@
             appId: "1:288530631805:web:a8a3fbc6a4205ee4e23514"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.firestore();
 
-        // دالة المتابعة الفورية لعدد موافقات الشروط
-        function listenAgreementsCount() {
+        let allSubscribersData = [];
+        let isFetching = false;
+
+        // دالة المتابعة الفورية لعدد زيارات الموقع
+        function listenVisitsCount() {
             try {
                 db.collection("subscribers").doc("agreements_counter").onSnapshot((doc) => {
-                    const el = document.getElementById('agreementsCountDisplay');
+                    const el = document.getElementById('visitsCountDisplay');
                     if (el) {
                         if (doc.exists) {
                             const data = doc.data();
-                            const count = data.agreeCount || 0;
-                            el.innerText = Number(count).toLocaleString('ar-EG');
+                            const count = data.visitCount || data.agreeCount || 0;
+                            el.innerText = Number(count).toLocaleString('ar-SA');
                         } else {
                             el.innerText = '0';
                         }
                     }
                 }, (error) => {
-                    console.error("Error loading agreements count:", error);
+                    console.error("Error listening to visits count:", error);
                 });
-            } catch(e) {
-                console.error("Exception loading agreements count:", e);
+            } catch (e) {
+                console.error("Exception in listenVisitsCount:", e);
             }
         }
 
-        // جلب قائمة المشتركين
+        // دالة جلب قائمة المشتركين مع أمان عدم التعليق (Timeout Safety)
         async function loadSubscribers() {
+            if (isFetching) return;
+            isFetching = true;
+
             const tbody = document.getElementById('subscribersTableBody');
-            tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-muted">جاري التحديث...</td></tr>`;
-            
+            const btnRefresh = document.getElementById('btnTableRefresh');
+            const btnTop = document.getElementById('btnTopRefresh');
+            if (btnRefresh) btnRefresh.disabled = true;
+            if (btnTop) btnTop.disabled = true;
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-4 text-muted">
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <span class="spinner-inline text-primary"></span>
+                            <span>جاري جلب وتحديث البيانات...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            // أمان مؤقت 12 ثانية حتى لا يعلق المتصفح أبداً
+            const fetchWithTimeout = Promise.race([
+                db.collection("subscribers").get(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout: تأخر استجابة السيرفر")), 12000))
+            ]);
+
             try {
-                const querySnapshot = await db.collection("subscribers").get();
-                tbody.innerHTML = '';
-                
-                let foundSubscribers = false;
+                const querySnapshot = await fetchWithTimeout;
+                allSubscribersData = [];
+                let activeCount = 0;
+                let devicesCount = 0;
+
                 querySnapshot.forEach((doc) => {
                     const docId = doc.id;
                     if (docId === "agreements_counter") return;
-                    foundSubscribers = true;
+
                     const data = doc.data();
                     const phone = data.phone || docId;
                     const expire = data.expireDate || 'غير محدد';
                     const active = data.isActive === true || data.isActive === 'true';
                     const pin = data.pinCode ? String(data.pinCode).trim() : '';
-                    const hasCloudData = !!(data.scheduleData);
+                    const hasCloudData = !(!data.scheduleData);
                     const lastSave = data.lastCloudSaveFormatted || data.lastCloudSave || '';
 
                     // حساب الأجهزة
@@ -204,69 +290,123 @@
                         devices = [data.deviceId.toString().trim()];
                     }
 
-                    const isSpecialCode = (phone === "1448" || docId === "1448");
-                    const count = devices.length;
-                    
-                    const deviceBadgeClass = isSpecialCode ? 'bg-success text-white' : (count > 0 ? (count >= 5 ? 'bg-warning text-dark' : 'bg-info text-dark') : 'bg-secondary text-white');
-                    const deviceBadgeText = isSpecialCode ? `📱 غير محدود (${count} جهاز)` : (count > 0 ? `📱 ${count} / 5 أجهزة` : '❌ لا يوجد');
+                    if (active) activeCount++;
+                    devicesCount += devices.length;
 
-                    // عمود الرمز السري PIN
-                    let pinHTML = "";
-                    if (isSpecialCode) {
-                        pinHTML = `<span class="badge bg-light text-muted">كود عام (بدون PIN)</span>`;
-                    } else if (pin) {
-                        pinHTML = `<span class="badge bg-dark pin-badge">${pin}</span>`;
-                    } else {
-                        pinHTML = `<span class="badge bg-warning text-dark">لم يُعيّن بعد ⚠️</span>`;
-                    }
-
-                    // عمود الحفظ السحابي
-                    let cloudHTML = "";
-                    if (hasCloudData) {
-                        cloudHTML = `
-                            <span class="badge bg-success" title="تم حفظ جدول المدرسة سحابياً">☁️ محفوظ</span>
-                            ${lastSave ? `<div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">${lastSave}</div>` : ''}
-                        `;
-                    } else {
-                        cloudHTML = `<span class="badge bg-light text-muted">لا يوجد جدول</span>`;
-                    }
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="fw-bold">${phone}</td>
-                        <td><span class="text-secondary">${expire}</span></td>
-                        <td><span class="status-badge ${active ? 'status-active' : 'status-inactive'}">${active ? 'نشط' : 'موقوف'}</span></td>
-                        <td>${pinHTML}</td>
-                        <td>${cloudHTML}</td>
-                        <td>
-                            <span class="badge ${deviceBadgeClass} fs-6">${deviceBadgeText}</span>
-                            ${count > 0 ? `<div style="font-size: 0.7rem; max-width: 150px; margin: 2px auto 0;" class="text-muted text-truncate" title="${devices.join('\n')}">${devices.join(', ')}</div>` : ''}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm">
-                                ${!isSpecialCode ? `<button onclick="editSubscriberPin('${docId}', '${phone}', '${pin}')" class="btn btn-outline-primary fw-bold" title="تعديل أو إعادة تعيين كلمة السر">🔑 PIN</button>` : ''}
-                                ${count > 0 ? `<button onclick="unlinkDevice('${docId}', '${phone}', '${expire}', ${active})" class="btn btn-outline-warning fw-bold" title="فك ارتباط الأجهزة">📱 فك</button>` : ''}
-                                <button onclick="deleteSubscriber('${docId}')" class="btn btn-outline-danger fw-bold" title="حذف المشترك">🗑️ حذف</button>
-                            </div>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
+                    allSubscribersData.push({
+                        docId,
+                        phone,
+                        expire,
+                        active,
+                        pin,
+                        hasCloudData,
+                        lastSave,
+                        devices,
+                        count: devices.length,
+                        raw: data
+                    });
                 });
 
-                if (!foundSubscribers) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-muted">لا يوجد أي مشتركين حالياً.</td></tr>`;
-                }
+                // تحديث بطاقات الإحصائيات
+                document.getElementById('totalSubscribersCount').innerText = allSubscribersData.length.toLocaleString('ar-SA');
+                document.getElementById('activeSubscribersCount').innerText = activeCount.toLocaleString('ar-SA');
+                document.getElementById('totalDevicesCount').innerText = devicesCount.toLocaleString('ar-SA');
+
+                renderSubscribersTable(allSubscribersData);
+
             } catch (error) {
-                console.error("Error: ", error);
-                tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-danger">فشل تحميل البيانات. تأكد من اتصال السيرفر واضغط تحديث البيانات.</td></tr>`;
+                console.error("Subscribers Load Error: ", error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-4 text-danger fw-bold">
+                            ⚠️ تعذر جلب البيانات من السيرفر. (${error.message})<br>
+                            <button onclick="loadSubscribers()" class="btn btn-sm btn-outline-danger mt-2">إعادة المحاولة 🔄</button>
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                isFetching = false;
+                if (btnRefresh) btnRefresh.disabled = false;
+                if (btnTop) btnTop.disabled = false;
             }
         }
 
-        // إضافة أو تعديل مشترك
+        // دالة رسم الجدول مع دعم الفلترة والبحث
+        function renderSubscribersTable(subscribers) {
+            const tbody = document.getElementById('subscribersTableBody');
+            tbody.innerHTML = '';
+
+            if (!subscribers || subscribers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-muted">لا يوجد أي مشتركين مسجلين حالياً.</td></tr>`;
+                return;
+            }
+
+            subscribers.forEach((sub) => {
+                const isSpecialCode = (sub.phone === "1448" || sub.docId === "1448");
+                const count = sub.count;
+
+                const deviceBadgeClass = isSpecialCode ? 'bg-success text-white' : (count > 0 ? (count >= 5 ? 'bg-warning text-dark' : 'bg-info text-dark') : 'bg-secondary text-white');
+                const deviceBadgeText = isSpecialCode ? `📱 غير محدود (${count} جهاز)` : (count > 0 ? `📱 ${count} / 5 أجهزة` : '❌ لا يوجد أجهزة');
+
+                // عمود PIN
+                let pinHTML = "";
+                if (isSpecialCode) {
+                    pinHTML = `<span class="badge bg-light text-muted">كود عام (بدون PIN)</span>`;
+                } else if (sub.pin) {
+                    pinHTML = `<span class="badge bg-dark pin-badge">${sub.pin}</span>`;
+                } else {
+                    pinHTML = `<span class="badge bg-warning text-dark">لم يُعيّن بعد ⚠️</span>`;
+                }
+
+                // عمود الحفظ السحابي
+                let cloudHTML = "";
+                if (sub.hasCloudData) {
+                    cloudHTML = `
+                        <span class="badge bg-success" title="تم حفظ جدول المدرسة سحابياً">☁️ محفوظ</span>
+                        ${sub.lastSave ? `<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">${sub.lastSave}</div>` : ''}
+                    `;
+                } else {
+                    cloudHTML = `<span class="badge bg-light text-muted">لا يوجد جدول</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold">${sub.phone}</td>
+                    <td><span class="text-secondary">${sub.expire}</span></td>
+                    <td><span class="status-badge ${sub.active ? 'status-active' : 'status-inactive'}">${sub.active ? 'نشط' : 'موقوف'}</span></td>
+                    <td>${pinHTML}</td>
+                    <td>${cloudHTML}</td>
+                    <td>
+                        <span class="badge ${deviceBadgeClass} fs-6">${deviceBadgeText}</span>
+                        ${count > 0 ? `<div style="font-size: 0.7rem; max-width: 150px; margin: 2px auto 0;" class="text-muted text-truncate" title="${sub.devices.join('\n')}">${sub.devices.join(', ')}</div>` : ''}
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            ${!isSpecialCode ? `<button onclick="editSubscriberPin('${sub.docId}', '${sub.phone}', '${sub.pin}')" class="btn btn-outline-primary fw-bold" title="تعديل أو إعادة تعيين كلمة السر">🔑 PIN</button>` : ''}
+                            ${count > 0 ? `<button onclick="unlinkDevice('${sub.docId}', '${sub.phone}', '${sub.expire}', ${sub.active})" class="btn btn-outline-warning fw-bold" title="فك ارتباط الأجهزة">📱 فك</button>` : ''}
+                            <button onclick="deleteSubscriber('${sub.docId}')" class="btn btn-outline-danger fw-bold" title="حذف المشترك">🗑️ حذف</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // فلترة الجدول بالبحث السريع
+        function filterSubscribers() {
+            const query = document.getElementById('searchPhoneInput').value.trim();
+            if (!query) {
+                renderSubscribersTable(allSubscribersData);
+                return;
+            }
+            const filtered = allSubscribersData.filter(s => s.phone.includes(query) || (s.pin && s.pin.includes(query)));
+            renderSubscribersTable(filtered);
+        }
+
+        // إضافة أو تجديد مشترك
         document.getElementById('subscriberForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const secret = document.getElementById('adminSecretKey').value.trim();
-            
             const phoneVal = document.getElementById('phone').value.trim();
             const expireVal = document.getElementById('expireDate').value;
             const activeVal = document.getElementById('isActive').value === "true";
@@ -276,8 +416,6 @@
                 phone: phoneVal,
                 expireDate: expireVal,
                 isActive: activeVal,
-                deviceId: "",
-                deviceIds: [],
                 secretKey: secret
             };
 
@@ -287,7 +425,6 @@
 
             try {
                 await db.collection("subscribers").doc(phoneVal).set(docData, { merge: true });
-
                 alert('تم حفظ وتأمين المشترك بنجاح بالسيرفر! 🛡️🎉');
                 document.getElementById('subscriberForm').reset();
                 loadSubscribers();
@@ -296,23 +433,20 @@
             }
         });
 
-        // تعديل أو تصفير كلمة السر (PIN) للمعلم
+        // تعديل أو تصفير كلمة السر (PIN)
         window.editSubscriberPin = async function(id, phone, currentPin) {
             const newPin = prompt(`أدخل كلمة السر (PIN) الجديدة للمشترك ${phone}: \n(اتركه فارغاً واضغط موافق لتصفيره وجعل المعلم يدخل كلمة سر جديدة بنفسه)`, currentPin || '');
-            
-            if (newPin === null) return; // المستخدم ضغط إلغاء
+            if (newPin === null) return;
 
             const secret = document.getElementById('adminSecretKey').value.trim();
             try {
                 if (newPin.trim() === '') {
-                    // تصفير الرمز
                     await db.collection("subscribers").doc(id).update({
                         pinCode: "",
                         secretKey: secret
                     });
                     alert(`✅ تم تصفير كلمة السر للمشترك ${phone}. سيطلب منه النظام تعيين كلمة سر جديدة عند الدخول.`);
                 } else {
-                    // تعيين رمز جديد
                     await db.collection("subscribers").doc(id).update({
                         pinCode: newPin.trim(),
                         secretKey: secret
@@ -321,7 +455,7 @@
                 }
                 loadSubscribers();
             } catch (error) {
-                alert('فشل تحديث كلمة السر! الخطأ: ' + error.message);
+                alert('فشل تغيير كلمة السر! الخطأ: ' + error.message);
             }
         };
 
@@ -357,30 +491,26 @@
             }
         };
 
-        // قفل الأمان عند فتح الصفحة
+        // نظام قفل الأمان عند فتح الصفحة مباشرة
         document.addEventListener("DOMContentLoaded", function() {
             function checkPassword() {
                 let password = prompt("الرجاء إدخال مفتاح الأمان لإظهار بيانات السيرفر:");
-                
                 if (password === "1000") {
                     document.getElementById("adminContent").style.display = "block";
-                    
                     const adminInput = document.getElementById('adminSecretKey');
                     if (adminInput) {
                         adminInput.value = "NasabiAdmin2026";
                     }
-
                     loadSubscribers();
-                    listenAgreementsCount();
+                    listenVisitsCount();
                 } else if (password === null) {
-                    alert("لا يمكنك تصفح اللوحة بدون مفتاح الأمان.");
+                    alert("لن يمكنك تصفح اللوحة بدون مفتاح الأمان.");
                     checkPassword();
                 } else {
                     alert("مفتاح الأمان غير صحيح! جرب مرة أخرى.");
                     checkPassword();
                 }
             }
-
             checkPassword();
         });
     </script>

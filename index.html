@@ -211,6 +211,37 @@
         }
         const db = firebase.firestore();
 
+        // إعدادات منصة الخطط الأسبوعية (Supabase) لحذف جداول وخطط المدرسة
+        const SUPABASE_CONFIG = {
+            url: "https://htsukephqsuqheavlclz.supabase.co",
+            key: "sb_publishable_2ussQ1LNWy-G-mUT5xNdAQ_0KLhVyAO"
+        };
+
+        // دالة مساعدة لحذف بيانات المدرسة من منصة الخطط (Supabase)
+        async function deleteSchoolDataFromPlans(phone) {
+            const cleanPhone = String(phone).trim();
+            if (!cleanPhone) return;
+
+            const headers = {
+                'apikey': SUPABASE_CONFIG.key,
+                'Authorization': `Bearer ${SUPABASE_CONFIG.key}`,
+                'Content-Type': 'application/json'
+            };
+
+            try {
+                // حذف الخطط الأسبوعية
+                await fetch(`${SUPABASE_CONFIG.url}/rest/v1/weekly_plans?school_phone=eq.${cleanPhone}`, { method: 'DELETE', headers });
+                // حذف المعلمين
+                await fetch(`${SUPABASE_CONFIG.url}/rest/v1/teachers?school_phone=eq.${cleanPhone}`, { method: 'DELETE', headers });
+                // حذف الفصول
+                await fetch(`${SUPABASE_CONFIG.url}/rest/v1/classes?school_phone=eq.${cleanPhone}`, { method: 'DELETE', headers });
+                // حذف المدرسة
+                await fetch(`${SUPABASE_CONFIG.url}/rest/v1/schools?phone=eq.${cleanPhone}`, { method: 'DELETE', headers });
+            } catch (e) {
+                console.warn('Error clearing Supabase school data:', e);
+            }
+        }
+
         let allSubscribersData = [];
         let isFetching = false;
 
@@ -362,8 +393,13 @@
                 let cloudHTML = "";
                 if (sub.hasCloudData) {
                     cloudHTML = `
-                        <span class="badge bg-success" title="تم حفظ جدول المدرسة سحابياً">☁️ محفوظ</span>
-                        ${sub.lastSave ? `<div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">${sub.lastSave}</div>` : ''}
+                        <div class="d-flex flex-column align-items-center gap-1">
+                            <span class="badge bg-success" title="تم حفظ جدول المدرسة سحابياً">☁️ محفوظ</span>
+                            ${sub.lastSave ? `<span style="font-size: 0.72rem; color: #64748b;">${sub.lastSave}</span>` : ''}
+                            <button onclick="clearSchoolCloudData('${sub.docId}', '${sub.phone}')" class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" style="font-size: 0.72rem;" title="مسح الجدول السحابي ومنصة الخطط للمدرسة">
+                                🗑️ مسح السحابة
+                            </button>
+                        </div>
                     `;
                 } else {
                     cloudHTML = `<span class="badge bg-light text-muted">لا يوجد جدول</span>`;
@@ -384,7 +420,8 @@
                         <div class="btn-group btn-group-sm">
                             ${!isSpecialCode ? `<button onclick="editSubscriberPin('${sub.docId}', '${sub.phone}', '${sub.pin}')" class="btn btn-outline-primary fw-bold" title="تعديل أو إعادة تعيين كلمة السر">🔑 PIN</button>` : ''}
                             ${count > 0 ? `<button onclick="unlinkDevice('${sub.docId}', '${sub.phone}', '${sub.expire}', ${sub.active})" class="btn btn-outline-warning fw-bold" title="فك ارتباط الأجهزة">📱 فك</button>` : ''}
-                            <button onclick="deleteSubscriber('${sub.docId}')" class="btn btn-outline-danger fw-bold" title="حذف المشترك">🗑️ حذف</button>
+                            <button onclick="clearSchoolCloudData('${sub.docId}', '${sub.phone}')" class="btn btn-outline-info fw-bold" title="مسح سحابة الجدول وخطط المدرسة">☁️ السحابة</button>
+                            <button onclick="deleteSubscriber('${sub.docId}', '${sub.phone}')" class="btn btn-outline-danger fw-bold" title="حذف المشترك نهائياً">🗑️ حذف الرقم</button>
                         </div>
                     </td>
                 `;
@@ -459,13 +496,43 @@
             }
         };
 
-        // حذف المشترك
-        window.deleteSubscriber = async function(id) {
-            if(confirm('هل أنت متأكد من حذف هذا المشترك نهائياً من السيرفر؟')) {
-                const secret = document.getElementById('adminSecretKey').value.trim();
+        // مسح سحابة المدرسة (تفريغ الجدول السحابي وحذف خطط وجداول المدرسة من السيرفر مع بقاء الاشتراك)
+        window.clearSchoolCloudData = async function(id, phone) {
+            const confirmMsg = `هل أنت متأكد من مسح سحابة الجدول للمشترك (${phone})؟\n\n- سيتم مسح الجدول السحابي من نصابي.\n- سيتم مسح جميع الفصول والمعلمين والخطط الأسبوعية للمدرسة.\n- سيبقى اشتراك المشترك وكلمة سره مفعلة.`;
+            if (!confirm(confirmMsg)) return;
+
+            const secret = document.getElementById('adminSecretKey').value.trim();
+            try {
+                // 1. مسح الجدول من سحابة Firebase
+                await db.collection("subscribers").doc(id).update({
+                    scheduleData: firebase.firestore.FieldValue.delete(),
+                    lastCloudSave: firebase.firestore.FieldValue.delete(),
+                    lastCloudSaveFormatted: firebase.firestore.FieldValue.delete(),
+                    secretKey: secret
+                });
+
+                // 2. مسح بيانات المدرسة من منصة الخطط (Supabase)
+                await deleteSchoolDataFromPlans(phone);
+
+                alert(`✅ تم مسح سحابة الجدول وبيانات المدرسة للمشترك (${phone}) بنجاح! ☁️🗑️`);
+                loadSubscribers();
+            } catch (error) {
+                alert('فشل مسح السحابة! تأكد من كود الأمان.\nالخطأ: ' + error.message);
+            }
+        };
+
+        // حذف المشترك بالكامل (حذف الرقم من السيرفر ومنصة الخطط)
+        window.deleteSubscriber = async function(id, phone) {
+            const targetPhone = phone || id;
+            if (confirm(`هل أنت متأكد من حذف المشترك (${targetPhone}) نهائياً من السيرفر وقاعدة البيانات ومنصة الخطط؟ 🗑️`)) {
                 try {
+                    // 1. حذف المشترك من Firebase
                     await db.collection("subscribers").doc(id).delete();
-                    alert('تم حذف المشترك بنجاح! 🗑️');
+
+                    // 2. حذف بيانات المدرسة من منصة الخطط (Supabase)
+                    await deleteSchoolDataFromPlans(targetPhone);
+
+                    alert(`تم حذف المشترك (${targetPhone}) وبياناته بالكامل بنجاح! 🗑️`);
                     loadSubscribers();
                 } catch (error) {
                     alert('فشل الحذف! تأكد من كود الأمان العلوي.\nالخطأ: ' + error.message);

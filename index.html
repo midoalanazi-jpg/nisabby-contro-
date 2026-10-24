@@ -211,6 +211,24 @@
         }
         const db = firebase.firestore();
 
+        // إجبار فايربيس على الاتصال المباشر السريع وتفادي تعليق قنوات البث في المتصفحات
+        try {
+            db.settings({
+                experimentalForceLongPolling: true
+            });
+        } catch (e) {
+            console.warn("Firestore settings error:", e);
+        }
+
+        // تفعيل التخزين السحابي المحلي التلقائي لتسريع الجلب الفوري في 0 ثانية
+        try {
+            db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+                console.warn("Persistence notice:", err.code);
+            });
+        } catch (e) {
+            console.warn("Enable persistence error:", e);
+        }
+
         // إعدادات منصة الخطط الأسبوعية (Supabase) لحذف جداول وخطط المدرسة
         const SUPABASE_CONFIG = {
             url: "https://htsukephqsuqheavlclz.supabase.co",
@@ -251,8 +269,8 @@
                 db.collection("subscribers").doc("agreements_counter").onSnapshot((doc) => {
                     const el = document.getElementById('visitsCountDisplay');
                     if (el) {
-                        if (doc.exists) {
-                            const data = doc.data();
+                        if (doc && doc.exists) {
+                            const data = doc.data() || {};
                             const count = data.visitCount || data.agreeCount || 0;
                             el.innerText = Number(count).toLocaleString('ar-SA');
                         } else {
@@ -261,15 +279,24 @@
                     }
                 }, (error) => {
                     console.error("Error listening to visits count:", error);
+                    // جلب احتياطي فوري في حال تعثر الاستماع المباشر
+                    db.collection("subscribers").doc("agreements_counter").get().then((doc) => {
+                        const el = document.getElementById('visitsCountDisplay');
+                        if (el && doc && doc.exists) {
+                            const data = doc.data() || {};
+                            const count = data.visitCount || data.agreeCount || 0;
+                            el.innerText = Number(count).toLocaleString('ar-SA');
+                        }
+                    }).catch(console.error);
                 });
             } catch (e) {
                 console.error("Exception in listenVisitsCount:", e);
             }
         }
 
-        // دالة جلب قائمة المشتركين مع أمان عدم التعليق (Timeout Safety)
-        async function loadSubscribers() {
-            if (isFetching) return;
+        // دالة جلب قائمة المشتركين مع أمان عدم التعليق وإعادة المحاولة التلقائية
+        async function loadSubscribers(isRetry = false) {
+            if (isFetching && !isRetry) return;
             isFetching = true;
 
             const tbody = document.getElementById('subscribersTableBody');
@@ -278,21 +305,23 @@
             if (btnRefresh) btnRefresh.disabled = true;
             if (btnTop) btnTop.disabled = true;
 
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="py-4 text-muted">
-                        <div class="d-flex align-items-center justify-content-center gap-2">
-                            <span class="spinner-inline text-primary"></span>
-                            <span>جاري جلب وتحديث البيانات...</span>
-                        </div>
-                    </td>
-                </tr>
-            `;
+            if (!isRetry) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-4 text-muted">
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <span class="spinner-inline text-primary"></span>
+                                <span>جاري جلب وتحديث البيانات...</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
 
-            // أمان مؤقت 12 ثانية حتى لا يعلق المتصفح أبداً
+            // مهلة أمان مرنة 20 ثانية مع الاتصال المباشر
             const fetchWithTimeout = Promise.race([
                 db.collection("subscribers").get(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout: تأخر استجابة السيرفر")), 12000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout: تأخر استجابة السيرفر")), 20000))
             ]);
 
             try {
@@ -339,14 +368,24 @@
                 });
 
                 // تحديث بطاقات الإحصائيات
-                document.getElementById('totalSubscribersCount').innerText = allSubscribersData.length.toLocaleString('ar-SA');
-                document.getElementById('activeSubscribersCount').innerText = activeCount.toLocaleString('ar-SA');
-                document.getElementById('totalDevicesCount').innerText = devicesCount.toLocaleString('ar-SA');
+                const totalEl = document.getElementById('totalSubscribersCount');
+                const activeEl = document.getElementById('activeSubscribersCount');
+                const devicesEl = document.getElementById('totalDevicesCount');
+                if (totalEl) totalEl.innerText = allSubscribersData.length.toLocaleString('ar-SA');
+                if (activeEl) activeEl.innerText = activeCount.toLocaleString('ar-SA');
+                if (devicesEl) devicesEl.innerText = devicesCount.toLocaleString('ar-SA');
 
                 renderSubscribersTable(allSubscribersData);
 
             } catch (error) {
                 console.error("Subscribers Load Error: ", error);
+                // محاولة إعادة الجلب تلقائياً لمرة واحدة في الخلفية
+                if (!isRetry) {
+                    setTimeout(() => {
+                        loadSubscribers(true);
+                    }, 1000);
+                    return;
+                }
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="7" class="py-4 text-danger fw-bold">
@@ -558,18 +597,30 @@
             }
         };
 
-        // نظام قفل الأمان عند فتح الصفحة مباشرة
+        // نظام قفل الأمان عند فتح الصفحة مباشرة مع تذكر الجلسة في التبويب الحالي
         document.addEventListener("DOMContentLoaded", function() {
+            function unlockAdmin() {
+                const adminContent = document.getElementById("adminContent");
+                if (adminContent) adminContent.style.display = "block";
+                const adminInput = document.getElementById('adminSecretKey');
+                if (adminInput && !adminInput.value) {
+                    adminInput.value = "NasabiAdmin2026";
+                }
+                loadSubscribers();
+                listenVisitsCount();
+            }
+
             function checkPassword() {
+                // إذا كان المستخدم قد أدخل الرمز مسبقاً في هذا التبويب، يفتح فوراً دون إزعاج
+                if (sessionStorage.getItem("nisabi_admin_auth") === "authenticated_1000") {
+                    unlockAdmin();
+                    return;
+                }
+
                 let password = prompt("الرجاء إدخال مفتاح الأمان لإظهار بيانات السيرفر:");
                 if (password === "1000") {
-                    document.getElementById("adminContent").style.display = "block";
-                    const adminInput = document.getElementById('adminSecretKey');
-                    if (adminInput) {
-                        adminInput.value = "NasabiAdmin2026";
-                    }
-                    loadSubscribers();
-                    listenVisitsCount();
+                    sessionStorage.setItem("nisabi_admin_auth", "authenticated_1000");
+                    unlockAdmin();
                 } else if (password === null) {
                     alert("لن يمكنك تصفح اللوحة بدون مفتاح الأمان.");
                     checkPassword();
@@ -578,6 +629,7 @@
                     checkPassword();
                 }
             }
+
             checkPassword();
         });
     </script>

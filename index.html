@@ -403,6 +403,227 @@
         let allSubscribersData = [];
         let isFetching = false;
 
+        let allAnalyticsData = [];
+        let analyticsModalInstance = null;
+
+        // دالة فتح نافذة تحليلات المدارس
+        function openSchoolAnalyticsModal() {
+            const modalEl = document.getElementById('schoolAnalyticsModal');
+            if (modalEl && typeof bootstrap !== 'undefined') {
+                if (!analyticsModalInstance) {
+                    analyticsModalInstance = new bootstrap.Modal(modalEl);
+                }
+                analyticsModalInstance.show();
+            }
+            fetchSchoolAnalyticsData();
+        }
+
+        // دالة جلب ودراسة تفاصيل نشاط المدارس ودخول المعلمين والإدارة
+        async function fetchSchoolAnalyticsData() {
+            const elTeacher = document.getElementById('totalTeacherVisitsDisplay');
+            const elAdmin = document.getElementById('totalAdminVisitsDisplay');
+            const btnRefresh = document.getElementById('btnRefreshAnalytics');
+            if (btnRefresh) btnRefresh.disabled = true;
+
+            try {
+                const headers = {
+                    'apikey': SUPABASE_CONFIG.key,
+                    'Authorization': `Bearer ${SUPABASE_CONFIG.key}`
+                };
+                const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/schools?select=phone,name,settings`, { headers });
+                let supabaseSchools = [];
+                if (res.ok) {
+                    supabaseSchools = await res.json();
+                }
+
+                // خريطة مدارس Supabase
+                const schoolMap = new Map();
+                supabaseSchools.forEach(s => {
+                    const cleanPhone = String(s.phone || '').trim();
+                    if (cleanPhone) schoolMap.set(cleanPhone, s);
+                });
+
+                let combined = [];
+                let grandTeacherVisits = 0;
+                let grandAdminVisits = 0;
+                const processedPhones = new Set();
+
+                // دمج مع مشتركي Firebase المسجلين
+                allSubscribersData.forEach(sub => {
+                    const phone = String(sub.phone || sub.docId || '').trim();
+                    if (!phone || phone === 'agreements_counter') return;
+                    processedPhones.add(phone);
+
+                    const spSchool = schoolMap.get(phone);
+
+                    // استخراج اسم المدرسة من Supabase أو Firebase
+                    let schoolName = '';
+                    if (spSchool && spSchool.name && spSchool.name.trim()) {
+                        schoolName = spSchool.name.trim();
+                    } else if (sub.raw && sub.raw.scheduleData && sub.raw.scheduleData.school && sub.raw.scheduleData.school.name) {
+                        schoolName = sub.raw.scheduleData.school.name.trim();
+                    } else if (sub.raw && sub.raw.schoolName) {
+                        schoolName = sub.raw.schoolName.trim();
+                    } else {
+                        schoolName = (phone === '1448') ? 'المشترك العام (كود 1448)' : 'مدرسة غير محددة الاسم';
+                    }
+
+                    const tVisits = Number(spSchool?.settings?.teacher_visits || sub.raw?.teacherVisits || 0);
+                    const aVisits = Number(spSchool?.settings?.admin_visits || sub.raw?.adminVisits || 0);
+                    const total = tVisits + aVisits;
+
+                    grandTeacherVisits += tVisits;
+                    grandAdminVisits += aVisits;
+
+                    combined.push({
+                        phone,
+                        name: schoolName,
+                        teacherVisits: tVisits,
+                        adminVisits: aVisits,
+                        totalVisits: total,
+                        lastTeacherVisit: spSchool?.settings?.last_teacher_visit || '',
+                        lastAdminVisit: spSchool?.settings?.last_admin_visit || '',
+                        active: sub.active,
+                        hasCloud: sub.hasCloudData
+                    });
+                });
+
+                // إضافة أي مدرسة مسجلة في Supabase ولم تكن في Firebase
+                supabaseSchools.forEach(s => {
+                    const phone = String(s.phone || '').trim();
+                    if (phone && !processedPhones.has(phone)) {
+                        const tVisits = Number(s.settings?.teacher_visits || 0);
+                        const aVisits = Number(s.settings?.admin_visits || 0);
+                        const total = tVisits + aVisits;
+                        grandTeacherVisits += tVisits;
+                        grandAdminVisits += aVisits;
+
+                        combined.push({
+                            phone,
+                            name: s.name ? s.name.trim() : 'مدرسة من المنصة',
+                            teacherVisits: tVisits,
+                            adminVisits: aVisits,
+                            totalVisits: total,
+                            lastTeacherVisit: s.settings?.last_teacher_visit || '',
+                            lastAdminVisit: s.settings?.last_admin_visit || '',
+                            active: true,
+                            hasCloud: true
+                        });
+                    }
+                });
+
+                // ترتيب المدارس تنازلياً حسب الأكثر تفاعلاً
+                combined.sort((a, b) => b.totalVisits - a.totalVisits);
+                allAnalyticsData = combined;
+
+                // تحديث البطاقات العلوية في اللوحة
+                if (elTeacher) elTeacher.innerText = grandTeacherVisits.toLocaleString('ar-SA');
+                if (elAdmin) elAdmin.innerText = grandAdminVisits.toLocaleString('ar-SA');
+
+                renderAnalyticsTable(allAnalyticsData);
+            } catch (err) {
+                console.error("Error fetching school analytics:", err);
+            } finally {
+                if (btnRefresh) btnRefresh.disabled = false;
+            }
+        }
+
+        // دالة رسم جدول تحليلات المدارس داخل النافذة
+        function renderAnalyticsTable(data) {
+            const tbody = document.getElementById('schoolAnalyticsTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const modalSchools = document.getElementById('modalActiveSchoolsCount');
+            const modalTeacher = document.getElementById('modalTotalTeacherVisits');
+            const modalAdmin = document.getElementById('modalTotalAdminVisits');
+            const modalGrand = document.getElementById('modalGrandTotalVisits');
+
+            let sumT = 0;
+            let sumA = 0;
+            let activeCount = 0;
+
+            data.forEach(item => {
+                sumT += item.teacherVisits;
+                sumA += item.adminVisits;
+                if (item.totalVisits > 0) activeCount++;
+            });
+
+            if (modalSchools) modalSchools.innerText = activeCount.toLocaleString('ar-SA') + ' / ' + data.length.toLocaleString('ar-SA');
+            if (modalTeacher) modalTeacher.innerText = sumT.toLocaleString('ar-SA');
+            if (modalAdmin) modalAdmin.innerText = sumA.toLocaleString('ar-SA');
+            if (modalGrand) modalGrand.innerText = (sumT + sumA).toLocaleString('ar-SA');
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="py-4 text-muted">لا توجد مدارس مسجلة مطابقة للبحث.</td></tr>';
+                return;
+            }
+
+            data.forEach((item, index) => {
+                let badgeClass = 'bg-secondary text-white';
+                let badgeText = 'بدون دخول';
+                if (item.totalVisits >= 50) {
+                    badgeClass = 'bg-success text-white';
+                    badgeText = '🔥 نشاط مرتفع';
+                } else if (item.totalVisits > 0) {
+                    badgeClass = 'bg-primary text-white';
+                    badgeText = '🟢 متفاعل';
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold text-muted">${index + 1}</td>
+                    <td class="fw-bold text-start ps-3">
+                        <span class="d-block text-dark fs-6">${item.name}</span>
+                        ${item.hasCloud ? '<small class="text-success" style="font-size: 0.72rem;">☁️ جدول محفوظ سحابياً</small>' : '<small class="text-muted" style="font-size: 0.72rem;">لم يحفظ الجدول سحابياً</small>'}
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border font-monospace fs-6 px-2 py-1">${item.phone}</span>
+                    </td>
+                    <td>
+                        <span class="badge text-white fs-6 px-3 py-1" style="background-color: #0d9488;">
+                            ${item.teacherVisits.toLocaleString('ar-SA')}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge text-white fs-6 px-3 py-1" style="background-color: #4f46e5;">
+                            ${item.adminVisits.toLocaleString('ar-SA')}
+                        </span>
+                    </td>
+                    <td>
+                        <strong class="fs-6 text-dark">${item.totalVisits.toLocaleString('ar-SA')}</strong>
+                    </td>
+                    <td>
+                        <span class="badge ${badgeClass}">${badgeText}</span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="https://nessaby.vercel.app/s/${item.phone}" target="_blank" class="btn btn-outline-info fw-bold" title="فتح رابط المعلمين للمدرسة">
+                                👨‍🏫 المعلمين
+                            </a>
+                            <a href="https://nessaby.vercel.app/s/${item.phone}/admin" target="_blank" class="btn btn-outline-primary fw-bold" title="فتح لوحة الإدارة للمدرسة">
+                                👔 الإدارة
+                            </a>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // فلترة جدول تحليلات المدارس بالبحث
+        function filterAnalyticsTable() {
+            const query = (document.getElementById('analyticsSearchInput')?.value || '').trim();
+            if (!query) {
+                renderAnalyticsTable(allAnalyticsData);
+                return;
+            }
+            const filtered = allAnalyticsData.filter(item => 
+                item.name.includes(query) || item.phone.includes(query)
+            );
+            renderAnalyticsTable(filtered);
+        }
+
         // دالة المتابعة الفورية لعدد زيارات الموقع
         function listenVisitsCount() {
             try {
@@ -516,7 +737,11 @@
                 if (devicesEl) devicesEl.innerText = devicesCount.toLocaleString('ar-SA');
 
                 renderSubscribersTable(allSubscribersData);
-                fetchSchoolAnalyticsData();
+                try {
+                    fetchSchoolAnalyticsData();
+                } catch (e) {
+                    console.warn("Analytics fetch notice:", e);
+                }
 
             } catch (error) {
                 console.error("Subscribers Load Error: ", error);
@@ -749,7 +974,11 @@
                 }
                 loadSubscribers();
                 listenVisitsCount();
-                fetchSchoolAnalyticsData();
+                try {
+                    fetchSchoolAnalyticsData();
+                } catch (e) {
+                    console.warn("Analytics fetch notice:", e);
+                }
             }
 
             function checkPassword() {
